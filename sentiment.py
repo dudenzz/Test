@@ -1,6 +1,11 @@
 from os import listdir
 from sklearn import svm
-
+from nltk.stem.porter import PorterStemmer
+from nltk.corpus import stopwords
+import re
+import math
+cachedStopWords = stopwords.words("english")
+min_lenght = 3
 
 class corpus:
     def __init__(self, dir_pos, dir_neg):
@@ -76,18 +81,54 @@ class document:
         self.positive = positive
         self.train = train
         self.text = text
+    def preprocessing(self,raw_tokens):
+        no_stopwords = [token for token in raw_tokens if token not in cachedStopWords]
+        stemmed_tokens = []
+        stemmer = PorterStemmer()
+        for token in no_stopwords:
+            stemmed_tokens.append(stemmer.stem(token))
+        p = re.compile('[a-zA-Z]+')
+        pattern_checked = []
+        for stem in stemmed_tokens:
+            if p.match(stem) and len(stem) >= min_lenght:
+                pattern_checked.append(stem)
+        return pattern_checked
     def get_unique_words(self):
         word_list = []
-        for word in self.text.split():
+
+        for word in self.preprocessing(self.text.split()):
             if not word in word_list:
                 word_list.append(word)
         return word_list
     def get_vector(self,inverse_vocabulary):
         lng = len(inverse_vocabulary)
         vector = [0 for i in range(lng)]
-        for word in self.text.split():
+        for word in self.preprocessing(self.text.split()):
             vector[inverse_vocabulary[word]] = 1
         return vector
+
+
+class tf_idf:
+    def __init__(self):
+        self.D = 0.0
+        self.df = {}
+    def add_document(self, document):
+        self.D += 1.0
+        for token in set(document):
+            self.df[token] += 1.0
+    def idf(self,token):
+        return math.log(self.D/self.df[token])
+    def tf(self,token,document):
+        liczba_wystapien_tokenu = 0.0
+        liczba_tokenow = 0.0
+        for t in document:
+            liczba_tokenow += 1.0
+            if t == token:
+                liczba_wystapien_tokenu += 1.0
+        return liczba_wystapien_tokenu/liczba_tokenow
+    def tfidf(self,token, document):
+        return self.tf(token,document) * self.idf(token)
+
 
 klasyfikator = svm.SVC(kernel="linear")
 crp = corpus("C:\\Users\\P0020049\\Downloads\\txt_sentoken\\pos","C:\\Users\\P0020049\\Downloads\\txt_sentoken\\neg")
